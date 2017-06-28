@@ -15,8 +15,8 @@ def remove_nan_from_set(input_set):
 
 
 def add_employee_full_name_to_umetrics(umetrics_df, umetrics_emp_df):
-    umetrics_emp_df = umetrics_emp_df.drop('Unnamed: 0', axis=1)
     merged_df = umertics_df.merge(umetrics_emp_df, how='inner', on='UniqueAwardNumber')
+    merged_df = merged_df.drop('Unnamed: 0', axis=1)
     unique_award_no_df = merged_df.groupby('UniqueAwardNumber')['FullName'].apply(set)
     unique_award_no_df = unique_award_no_df.reset_index()
     result_df = umetrics_df.merge(unique_award_no_df, how='inner', on='UniqueAwardNumber')
