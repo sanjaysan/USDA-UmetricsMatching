@@ -1,5 +1,6 @@
-import py_entitymatching as em
 import pandas as pd
+import math
+import numpy as np
 
 
 def is_primarykey(df_column):
@@ -8,73 +9,52 @@ def is_primarykey(df_column):
         return True
     return False
 
-def add_employee_full_name_to_umetrics(umetrics_df, usda_df, umetrics_emp_df):
 
-    print usda_df[usda_df['UniqueAwardNumber'].isin(umetrics_emp_df['UniqueAwardNumber'])]
-
-def normalize_attribute_names(umetrics_csv, usda_csv):
-    #
-    umetrics_df = em.read_csv_metadata(umetrics_csv, key='UniqueAwardNumber')
-    usda_df = em.read_csv_metadata(usda_csv, key='Accession Number')
-    umetrics_cols = umetrics_df.columns
-    usda_cols = usda_df.columns
-    #
-    # print(len(umetrics_cols))
-    # print (len(usda_cols))
-
-    df1 = pd.DataFrame({'UMetric_cols':umetrics_cols})
-    df1.to_csv('df1.csv')
-    df2 = pd.DataFrame({'USDA_cols':usda_cols})
-    df2.to_csv('df2.csv')
+def remove_nan_from_set(input_set):
+    return [item for item in input_set if str(item) != 'nan']
 
 
+def add_employee_full_name_to_umetrics(umetrics_df, umetrics_emp_df):
+    umetrics_emp_df = umetrics_emp_df.drop('Unnamed: 0', axis=1)
+    merged_df = umertics_df.merge(umetrics_emp_df, how='inner', on='UniqueAwardNumber')
+    unique_award_no_df = merged_df.groupby('UniqueAwardNumber')['FullName'].apply(set)
+    unique_award_no_df = unique_award_no_df.reset_index()
+    result_df = umetrics_df.merge(unique_award_no_df, how='inner', on='UniqueAwardNumber')
+    result_df = result_df.rename(index=str, columns={"FullName": "EmployeeName"})
+    result_df['EmployeeName'] = result_df['EmployeeName'].apply(remove_nan_from_set)
+    result_df['EmployeeName'] = result_df['EmployeeName'].apply(lambda x: " | ".join(x) if x else np.NaN)
+    return result_df
 
-    id = range(max(len(df1), len(df2)))
-    # col_df = pd.DataFrame(columns=['UMetric_cols','USDA_cols'], index=id)
-    col_df = pd.concat([df1, df2], axis = 1)
-    col_df.insert(0, 'id', id)
-    # print col_df
-    col_df.to_csv('col_df.csv')
-    # #
-    # #
-    # # A = em.read_csv_metadata('df1.csv', key='UMetric_cols')
-    # # B = em.read_csv_metadata('df2.csv', key='USDA_cols')
-    # # col_df_em = em.read_csv_metadata('col_df.csv', key='id')
-    # # # print type(umetrics_cols)
-    # # ob = em.OverlapBlocker()
-    # # C1 = ob.block_tables(A, B, 'UMetric_cols', 'USDA_cols', word_level=True, overlap_size=3,
-    # #                      l_output_attrs=['UMetric_cols'],
-    # #                      r_output_attrs=['USDA_cols'],
-    # # show_progress = False)
-    # # print C1.head()
 
+def normalize_attribute_names(usda_csv):
     usda_df = pd.read_csv(usda_csv)
-    usda_df = usda_df.rename(index=str, columns={"Project Title":"AwardTitle",
-                                                 "Award Number":"UniqueAwardNumber",
-                                                 "Project Start Date":"FirstTransDate",
-                                                 "Project End Date":"LastTransDate"})
-    usda_df.to_csv('USDA_Award_Matching_copy.csv')
+    usda_df = usda_df.rename(index=str, columns={"Project Title": "AwardTitle",
+                                                 "Award Number": "UniqueAwardNumber",
+                                                 "Project Start Date": "FirstTransDate",
+                                                 "Project End Date": "LastTransDate",
+                                                 "Project Director": "EmployeeName"})
     return usda_df
 
 
-
-
 if __name__ == '__main__':
-
     umetrics_csv = '../Dataset/UMETRICS_Award_Agg_Matching.csv'
     umetrics_emp_csv = '../Dataset/UMETRICS_Employees_Matching.csv'
     usda_csv = '../Dataset/USDA_Award_Matching.csv'
+
     pd.set_option('display.expand_frame_repr', False)
 
     umertics_df = pd.read_csv(umetrics_csv)
-    umetric_primary_key = is_primarykey(umertics_df['UniqueAwardNumber'])
-    # print umetric_primary_key
-
     usda_df = pd.read_csv(usda_csv)
-    usda_primary_key = is_primarykey(usda_df['Accession Number'])
-    # print usda_primary_key
 
-    usda_df = normalize_attribute_names(umetrics_csv, usda_csv)
+    umetric_primary_key = is_primarykey(umertics_df['UniqueAwardNumber'])
+    print umetric_primary_key
+    usda_primary_key = is_primarykey(usda_df['Accession Number'])
+    print usda_primary_key
 
     umetrics_emp_df = pd.read_csv(umetrics_emp_csv)
-    add_employee_full_name_to_umetrics(umertics_df, usda_df, umetrics_emp_df)
+
+    umetrics_with_emp_df = add_employee_full_name_to_umetrics(umertics_df, umetrics_emp_df)
+    usda_df = normalize_attribute_names(usda_csv)
+
+    usda_df.to_csv('../Dataset/USDA_Award_Matching_copy.csv')
+    umetrics_with_emp_df.to_csv('../Dataset/UMETRICS_Award_Agg_Matching_copy.csv')
